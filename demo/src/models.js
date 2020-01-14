@@ -1,5 +1,8 @@
 
-import Eng_GPT2_345 from './components/demos/Eng_GPT2_345';
+import Gpt2_345 from './components/demos/Gpt2_345';
+import DistilmBert from './components/demos/DistilmBert';
+import BertLM from './components/demos/BertLM';
+import mBert from './components/demos/mBert';
 import annotateIcon from './icons/annotate-14px.svg';
 import otherIcon from './icons/other-14px.svg';
 import parseIcon from './icons/parse-14px.svg';
@@ -14,20 +17,19 @@ const modelGroups = [
         iconSrc: otherIcon,
         defaultOpen: true,
         models: [
-            // {model: "textual-entailment", name: "Textual Entailment", component: TextualEntailment},
-            // {model: "event2mind", name: "Event2Mind", component: Event2Mind},
-            {model: "eng-gpt2-345", name: "GPT2 345M", component: Eng_GPT2_345, redirects: ["gpt2"]},
-            // {model: "masked-lm", name: "Masked Language Modeling", component: MaskedLm}
+            {model: "gpt2-345", name: "GPT2 345M", component: Gpt2_345, redirects: ["gpt2"]},
+            {model: "bert-lm", name: "Bert Masked LM", component: BertLM}
         ]
     },
-    // {
-    //     label: "Contributing",
-    //     iconSrc: addIcon,
-    //     defaultOpen: true,
-    //     models: [
-    //         {model: "user-models", name: "Your model here!"}
-    //     ]
-    // }
+    {
+        label: "Multilingual LM",
+        iconSrc: parseIcon,
+        defaultOpen: true,
+        models: [
+          {model: "mbert", name: "Mutilingual Bert", component: mBert},
+          {model: "distilmbert", name: "Distil Mutilingual Bert", component: DistilmBert},
+        ]
+    }
 ]
 
 // Create mapping from model to component

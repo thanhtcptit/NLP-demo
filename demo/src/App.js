@@ -24,7 +24,7 @@ import './css/visualization-types.css';
   <App /> Container
 *******************************************************************************/
 
-const DEFAULT_PATH = "/eng-gpt2-345"
+const DEFAULT_PATH = "/gpt2-345"
 
 /*
 The App is just a react-router wrapped around the Demo component.

@@ -6,6 +6,8 @@ from allennlp.models.archival import load_archive
 
 from server.demo_model import DemoModel
 from server.gpt2 import Gpt2DemoModel
+from server.bert import BertDemoModel
+from server.distilBert import DistilBertDemoModel
 
 # This maps from the name of the task
 # to the ``DemoModel`` indicating the location of the trained model
@@ -41,6 +43,10 @@ def load_demo_models(models_file: str,
             load = DemoModel
         elif model_type == "gpt2":
             load = Gpt2DemoModel
+        elif model_type == 'distilbert':
+            load = DistilBertDemoModel
+        elif model_type == 'bert':
+            load = BertDemoModel
         else:
             raise ValueError(f"unknown model type: {model_type}")
 

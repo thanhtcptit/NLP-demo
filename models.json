@@ -1,7 +1,27 @@
 {
-    "eng-gpt2-345": {
+    "gpt2-345": {
         "archive_file": "https://storage.googleapis.com/allennlp-public-models/gpt2-next-word-lm-2019.09.19.tar.gz",
         "predictor_name": "next_token_lm",
+        "max_request_length": 10000,
+        "memory": "4Gi"
+    },
+    "bert-lm": {
+        "archive_file": "https://storage.googleapis.com/allennlp-public-models/bert-masked-lm-2019.09.17.tar.gz",
+        "predictor_name": "masked_language_model",
+        "max_request_length": 10000,
+        "memory": "4Gi"
+    },
+    "mbert": {
+        "archive_file": "",
+        "type": "bert",
+        "predictor_name": "bert-base-multilingual-cased",
+        "max_request_length": 10000,
+        "memory": "4Gi"
+    },
+    "distilmbert": {
+        "archive_file": "",
+        "type": "distilbert",
+        "predictor_name": "distilmbert",
         "max_request_length": 10000,
         "memory": "4Gi"
     }

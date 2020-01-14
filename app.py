@@ -8,9 +8,11 @@ from typing import Dict, Optional, List, Iterable
 import argparse
 import json
 import logging
+import re
 import os
 import sys
 import time
+import random
 from functools import lru_cache
 from collections import defaultdict
 
@@ -49,7 +51,7 @@ logger.addHandler(handler)
 logger.propagate = False
 
 supported_interpret_models = {
-    'eng-gpt2-345'}
+    'gpt2-345'}
 
 
 class ServerError(Exception):
@@ -118,6 +120,15 @@ def make_app(build_dir: str,
     start_time = datetime.now(pytz.utc)
     start_time_str = start_time.strftime("%Y-%m-%d %H:%M:%S %Z")
 
+    # Read titles data
+    titles = []
+    with open('data/imdb_titles_eng.txt', encoding='utf-8') as f:
+        for line in f:
+            tokens = line.split()
+            if len(tokens) >= 3:
+                titles.append(tokens)
+
+    app.titles = titles
     app.predictors = {}
     # requests longer than these will be rejected to prevent OOME
     app.max_request_lengths = {}
@@ -144,7 +155,7 @@ def make_app(build_dir: str,
                     predictor)
                 if name == 'masked-lm':
                     app.attackers[name]["hotflip"] = Hotflip(predictor, 'bert')
-                elif name == "eng-gpt2-345":
+                elif name == "gpt2-345":
                     app.attackers[name]["hotflip"] = Hotflip(predictor, 'gpt2')
                 elif 'named-entity-recognition' in name:
                     # We haven't implemented hotflip for NER.
@@ -331,10 +342,19 @@ def make_app(build_dir: str,
             time.sleep(0.25)
 
         prediction['time'] = '%.03f' % ((time.time() - _start) * 1000)
-        logger.info("prediction: %s", json.dumps(log_blob))
+        # logger.info("prediction: %s", json.dumps(log_blob))
         logger.info(f"result: {prediction}")
 
         return jsonify(prediction)
+
+    @app.route('/rand', methods=['POST'])
+    def random_prefix_title() -> Response:
+        ind = random.randint(0, len(app.titles))
+        prefix = ' '.join(app.titles[ind][:2])
+        prefix = re.sub('[^0-9a-zA-Z\s+]+', '', prefix)
+        prefix = re.sub('\s+', ' ', prefix)
+        logger.info(' '.join(app.titles[ind]))
+        return jsonify({"prefix": prefix})
 
     @app.route('/attack/<model_name>', methods=['POST', 'OPTIONS'])
     def attack(model_name: str) -> Response:

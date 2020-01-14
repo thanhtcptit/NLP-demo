@@ -16,9 +16,10 @@ import {
   SG_INTERPRETER,
   HOTFLIP_ATTACKER
 } from '../InterpretConstants'
-const apiUrl = () => `${API_ROOT}/predict/eng-gpt2-345`
-const apiUrlInterpret = () => `${API_ROOT}/interpret/eng-gpt2-345`
-const apiUrlAttack = () => `${API_ROOT}/attack/eng-gpt2-345`
+const apiUrl = () => `${API_ROOT}/predict/gpt2-345`
+const apiUrlInterpret = () => `${API_ROOT}/interpret/gpt2-345`
+const apiUrlAttack = () => `${API_ROOT}/attack/gpt2-345`
+const apiRandTitle = () => `${API_ROOT}/rand`
 
 const NAME_OF_INPUT_TO_ATTACK = "tokens"
 const NAME_OF_GRAD_INPUT = "grad_input_1"
@@ -139,7 +140,7 @@ const Token = styled.span`
   font-weight: 600;
 `
 
-const DEFAULT = "Joel is";
+var DEFAULT = "Joel is";
 
 function addToUrl(output, choice) {
   if (window.frameElement) {
@@ -233,9 +234,17 @@ class App extends React.Component {
     super(props)
 
     this.currentRequestId = 0;
+    var that = this;
+
+    this.choose = this.choose.bind(this)
+    this.debouncedChoose = _.debounce(this.choose, 1000)
+    this.setOutput = this.setOutput.bind(this)
+    this.runOnEnter = this.runOnEnter.bind(this)
+    this.interpretModel = this.interpretModel.bind(this)
+    this.attackModel = this.attackModel.bind(this)
 
     this.state = {
-      output: loadFromUrl() || DEFAULT,
+      output: "",
       words: null,
       logits: null,
       probabilities: null,
@@ -246,12 +255,16 @@ class App extends React.Component {
       attackData: null
     }
 
-    this.choose = this.choose.bind(this)
-    this.debouncedChoose = _.debounce(this.choose, 1000)
-    this.setOutput = this.setOutput.bind(this)
-    this.runOnEnter = this.runOnEnter.bind(this)
-    this.interpretModel = this.interpretModel.bind(this)
-    this.attackModel = this.attackModel.bind(this)
+    fetch(apiRandTitle(), {
+      method: "POST"
+    })
+    .then(response => response.json())
+    .then(data => {
+      DEFAULT = data.prefix;
+      that.setState({output: loadFromUrl() || DEFAULT});
+      that.choose()
+    })
+
   }
 
   setOutput(evt) {
@@ -397,7 +410,7 @@ class App extends React.Component {
                     <span role="img" aria-label="warning">️⚠</span> Something went wrong. Please try again.
                   </Error>
                 ) : null}
-              Time: {this.state.time} ms
+              Time: {this.state.time === undefined ? 0 : this.state.time} ms
             </InputOutputColumn>
             <InputOutputColumn>
               <FormLabel>Predictions:</FormLabel>
