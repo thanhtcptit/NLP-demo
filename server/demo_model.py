@@ -1,6 +1,9 @@
 from allennlp.predictors import Predictor
 from allennlp.models.archival import load_archive
 
+from server.tones_prediction.transfomer_decoder import \
+    TransformerDecoderPredictor
+
 
 class DemoModel:
     """
@@ -27,3 +30,16 @@ class DemoModel:
     def predictor(self) -> Predictor:
         archive = load_archive(self.archive_file)
         return Predictor.from_archive(archive, self.predictor_name)
+
+
+class CustomModel:
+    def __init__(self, predictor_name, *args, **kwargs) -> None:
+        self.predictor_name = predictor_name
+        self.args = args
+        self.kwargs = kwargs
+
+    def predictor(self):
+        if self.predictor_name == 'transformer_decoder':
+            return TransformerDecoderPredictor(*self.args, **self.kwargs)
+        else:
+            raise ValueError('Unknown custom model')

@@ -1,6 +1,7 @@
 from flask import Response, current_app
 from pythonjsonlogger import jsonlogger
 
+
 def with_no_cache_headers(request: Response) -> Response:
     """
     Returns the provided request with the appropriate HTTP headers for

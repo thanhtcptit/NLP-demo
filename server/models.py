@@ -4,10 +4,10 @@ import json
 from allennlp.predictors import Predictor
 from allennlp.models.archival import load_archive
 
-from server.demo_model import DemoModel
-from server.gpt2 import Gpt2DemoModel
-from server.bert import BertDemoModel
-from server.distilBert import DistilBertDemoModel
+from server.demo_model import DemoModel, CustomModel
+from server.language_model.gpt2 import Gpt2DemoModel
+from server.language_model.bert import BertDemoModel
+from server.language_model.distilBert import DistilBertDemoModel
 
 # This maps from the name of the task
 # to the ``DemoModel`` indicating the location of the trained model
@@ -47,13 +47,19 @@ def load_demo_models(models_file: str,
             load = DistilBertDemoModel
         elif model_type == 'bert':
             load = BertDemoModel
+        elif model_type == 'custom':
+            load = CustomModel
         else:
             raise ValueError(f"unknown model type: {model_type}")
 
-        demo_models[task_name] = load(
-            archive_file=model["archive_file"],
-            predictor_name=model["predictor_name"],
-            max_request_length=model["max_request_length"]
-        )
+        if model_type != 'custom':
+            demo_models[task_name] = load(
+                archive_file=model["archive_file"],
+                predictor_name=model["predictor_name"],
+                max_request_length=model["max_request_length"]
+            )
+        else:
+            model.pop('type')
+            demo_models[task_name] = load(**model)
 
     return demo_models

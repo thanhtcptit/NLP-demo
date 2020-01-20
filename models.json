@@ -24,5 +24,20 @@
         "predictor_name": "distilmbert",
         "max_request_length": 10000,
         "memory": "4Gi"
+    },
+    "transformer_decoder": {
+        "type": "custom",
+        "predictor_name": "transformer_decoder",
+        "vocab_path": "models/transformer-decoder/vocab.txt",
+        "ckpt_path": "models/transformer-decoder/",
+        "saved_args_path": "models/transformer-decoder/args.pkl",
+        "beam_size": 3
+    },
+    "transformer_decoder_seq": {
+        "type": "custom",
+        "predictor_name": "transformer_decoder",
+        "vocab_path": "models/transformer-decoder-seq/vocab.txt",
+        "ckpt_path": "models/transformer-decoder-seq/",
+        "saved_args_path": "models/transformer-decoder-seq/args.pkl"
     }
 }

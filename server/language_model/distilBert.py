@@ -25,7 +25,6 @@ class DistilBertPredictor():
         best_words = [[' ' + self.tokenizer.decode([idx.item()])
                        for idx in best_indices[i]]
                       for i in range(len(best_indices))]
-        print(logits.shape)
         print(best_words)
 
         probs = torch.nn.functional.softmax(logits[mask_token_ind])
@@ -40,7 +39,6 @@ class DistilBertPredictor():
     def _predict(self, query: str) -> torch.Tensor:
         input_ids = torch.tensor(
             self.tokenizer.encode(query, add_special_tokens=True)).unsqueeze(0)
-        print(input_ids)
         print([self.tokenizer.decode(i) for i in input_ids[0].tolist()])
         mask_token_ind = input_ids[0].tolist().index(103)
         with torch.no_grad():

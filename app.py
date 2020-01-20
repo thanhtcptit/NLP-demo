@@ -142,7 +142,8 @@ def make_app(build_dir: str,
             logger.info(f"loading {name} model")
             predictor = demo_model.predictor()
             app.predictors[name] = predictor
-            app.max_request_lengths[name] = demo_model.max_request_length
+            app.max_request_lengths[name] = 10000
+            # demo_model.max_request_length
 
             if name in supported_interpret_models:
                 app.interpreters[name]['simple_gradient'] = SimpleGradient(

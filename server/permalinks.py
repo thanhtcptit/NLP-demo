@@ -14,6 +14,7 @@ Permadata = NamedTuple("Permadata", [("model_name", str),
                                      ("request_data", JsonDict),
                                      ("response_data", JsonDict)])
 
+
 def int_to_slug(i: int) -> str:
     """
     Turn an integer id into a semi-opaque string slug
@@ -22,6 +23,7 @@ def int_to_slug(i: int) -> str:
     byt = str(i).encode('utf-8')
     slug_bytes = base64.urlsafe_b64encode(byt)
     return slug_bytes.decode('utf-8')
+
 
 def slug_to_int(slug: str) -> Optional[int]:
     """

@@ -3,6 +3,8 @@ import Gpt2_345 from './components/demos/Gpt2_345';
 import DistilmBert from './components/demos/DistilmBert';
 import BertLM from './components/demos/BertLM';
 import mBert from './components/demos/mBert';
+import TransformerDecoder from './components/demos/TransformerDecoder'
+import TransformerDecoderSeq from './components/demos/TransformerDecoderSeq'
 import annotateIcon from './icons/annotate-14px.svg';
 import otherIcon from './icons/other-14px.svg';
 import parseIcon from './icons/parse-14px.svg';
@@ -29,7 +31,16 @@ const modelGroups = [
           {model: "mbert", name: "Mutilingual Bert", component: mBert},
           {model: "distilmbert", name: "Distil Mutilingual Bert", component: DistilmBert},
         ]
-    }
+    },
+    {
+      label: "Tone Prediction",
+      iconSrc: passageIcon,
+      defaultOpen: true,
+      models: [
+        {model: "transform_decoder", name: "Autoregressive Transformer-Decoder", component: TransformerDecoder},
+        {model: "transform_decoder_seq", name: "Seq2Seq Transformer-Decoder", component: TransformerDecoderSeq},
+      ]
+  }
 ]
 
 // Create mapping from model to component
