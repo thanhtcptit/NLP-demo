@@ -1,26 +1,26 @@
-# !/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 import os
-import _pickle as cPickle
+import time
 
 import numpy as np
 import tensorflow as tf
 
-from server.tones_prediction.models import TransformerDecoder
-from server.tones_prediction.tone_utils import clear_all_marks
-from server.tones_prediction.data_load import basic_tokenizer, load_vocab
-
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+from nsds.common import Params
+from server.utils import load_model, clear_all_marks, basic_tokenizer, \
+    load_vocab
 
 
 class TransformerDecoderPredictor():
-    def __init__(self, vocab_path, ckpt_path, saved_args_path, beam_size=0):
+    def __init__(self, config_path, model_path, beam_size=0,
+                 in_graph_beam_search=True):
+        params = Params.from_file(config_path)
+        self.data_params = params['data']
+        self.model_params = params['model']
+
+        self.max_length = self.data_params['max_length']
         self.beam_size = beam_size
-        with open(saved_args_path, 'rb') as f:
-            self.saved_args = cPickle.load(f)
-        self.word2idx, self.idx2word = load_vocab(vocab_path)
+        self.in_graph_beam_search = in_graph_beam_search
+        self.word2idx, self.idx2word = load_vocab(
+            self.data_params['vocab_path'])
 
         self.ref = {}
         ind = 0
@@ -40,41 +40,59 @@ class TransformerDecoderPredictor():
                 if token not in curr:
                     curr.append(token)
 
-        self.model = TransformerDecoder(False, self.saved_args)
-        self.graph = self.model.graph
-        with self.graph.as_default():
-            self.sess = tf.Session(graph=self.model.graph)
-            self.sess.run(tf.global_variables_initializer())
+        sess_config = tf.ConfigProto()
+        sess_config.gpu_options.allow_growth = True
+        sess_config.gpu_options.per_process_gpu_memory_fraction = 0.5
+        self.sess = tf.Session(config=sess_config)
 
-            saver = tf.train.Saver(tf.global_variables())
-            ckpt = tf.train.get_checkpoint_state(ckpt_path)
-            saver.restore(self.sess, ckpt.model_checkpoint_path)
+        load_model(model_path, session=self.sess)
+        self.x = tf.get_default_graph().get_tensor_by_name(
+            'Placeholder:0')
+        try:
+            self.logits = tf.get_default_graph().get_tensor_by_name(
+                'decoder/MatMul:0')
+        except KeyError:
+            self.logits = tf.get_default_graph().get_tensor_by_name(
+                'MatMul:0')
+
+        self.prediction = tf.get_default_graph().get_tensor_by_name(
+            'ToInt32:0')
+        self.probs = tf.nn.softmax(self.logits)
 
     def predict(self, text):
-        words = basic_tokenizer(text)[:self.saved_args.maxlen]
+        words = basic_tokenizer(text)[:self.max_length]
         pad_idx = self.word2idx["<pad>"]
 
         if self.beam_size:
-            sos_idx = self.word2idx["<sos>"]
-            init_state = np.full(
-                shape=(self.saved_args.maxlen + 1), fill_value=pad_idx)
-            init_state[0] = sos_idx
-            with self.graph.as_default():
+            if self.in_graph_beam_search:
+                x = np.asarray([self.ref[w] if w in self.ref
+                               else self.ref["<unk>"] for w in words])
+                x = np.atleast_2d(
+                    np.lib.pad(x, [0, self.max_length - len(x) + 1],
+                               'constant', constant_values=pad_idx))
+                res = self.sess.run(tf.nn.ctc_beam_search_decoder(
+                    tf.expand_dims(self.logits, 1), [self.max_length], 3,
+                    merge_repeated=False),
+                    feed_dict={self.x: x})
+                paths = [res[0][0].values[:len(words)]]
+            else:
+                sos_idx = self.word2idx["<sos>"]
+                init_state = np.full(
+                    shape=(self.max_length + 1), fill_value=pad_idx)
+                init_state[0] = sos_idx
                 init_probs = self.sess.run(
-                    tf.nn.softmax(self.model.logits),
-                    feed_dict={self.model.x: np.atleast_2d(init_state)})[0]
-                paths, state_probs = self.beamsearch_transformer(
-                    words, self.saved_args.maxlen, init_probs)
+                    self.probs,
+                    feed_dict={self.x: np.atleast_2d(init_state)})[0]
+                paths, state_probs = self.beam_search(
+                    words, self.max_length, init_probs)
         else:
             x = np.asarray([self.ref[w] if w in self.ref
                             else self.ref["<unk>"] for w in words])
             x = np.atleast_2d(
-                np.lib.pad(x, [0, self.saved_args.maxlen - len(x)],
+                np.lib.pad(x, [0, self.max_length - len(x)],
                            'constant', constant_values=pad_idx))
-            with self.graph.as_default():
-                feed = {self.model.x: x}
-                paths = [self.sess.run(self.model.preds, feed_dict=feed)]
-                paths[0][len(words):] = pad_idx
+            paths = [self.sess.run(self.prediction, feed_dict={self.x: x})]
+            paths[0][len(words):] = pad_idx
 
         results = []
         for path in paths:
@@ -83,7 +101,8 @@ class TransformerDecoderPredictor():
                 if token == pad_idx:
                     break
                 if token != self.word2idx["<unk>"] and token != -1 and \
-                        token < len(self.idx2word):
+                        token < len(self.idx2word) and \
+                        clear_all_marks(self.idx2word[token]) == words[idx]:
                     tokens.append(self.idx2word[token])
                 else:
                     tokens.append(words[idx])
@@ -112,7 +131,7 @@ class TransformerDecoderPredictor():
             possible_candidates = possible_candidates[top_k]
             return possible_candidates, probs[possible_candidates]
 
-    def beamsearch_transformer(self, sent, maxlen, initial_probs):
+    def beam_search(self, sent, max_length, initial_probs):
         stop_token = self.word2idx["<pad>"]
         num_tokens = len(sent)
         state_probs = np.zeros(self.beam_size, dtype=np.float32)
@@ -121,7 +140,7 @@ class TransformerDecoderPredictor():
         all_candidates_probs = np.zeros(
             [self.beam_size, self.beam_size], dtype=np.float32)
         paths = np.zeros([self.beam_size, num_tokens], dtype=np.int32)
-        states = np.zeros([self.beam_size, maxlen + 1], dtype=np.int32)
+        states = np.zeros([self.beam_size, max_length + 1], dtype=np.int32)
         sum_probs = 0.0
 
         # initializing first graph level
@@ -146,9 +165,8 @@ class TransformerDecoderPredictor():
                     top_k.append(top_k[0])
                 feed = states[s_idx].copy()
                 initial_probs = self.sess.run(
-                    self.model.logits, feed_dict={
-                        self.model.x: np.atleast_2d(feed)})[level]
-                initial_probs = self.sess.run(tf.nn.softmax(initial_probs))
+                    self.probs, feed_dict={
+                        self.x: np.atleast_2d(feed)})[level]
 
                 top_prob_indices, _ = self.find_candidates(
                     initial_probs, sent[level])
@@ -188,3 +206,12 @@ class TransformerDecoderPredictor():
             paths = tmp_path
 
         return paths, state_probs
+
+
+if __name__ == '__main__':
+    s = time.time()
+    cfg_path = 'resources/transformer_decoder/config/transformer_decoder.json'
+    model_path = 'resources/transformer_decoder/model_epoch_06_gs_60792.pb'
+    model = TransformerDecoderPredictor(cfg_path, model_path, beam_size=0)
+    print(model.predict('Mot con vit xoe ra hai cai canh'))
+    print(time.time() - s)
