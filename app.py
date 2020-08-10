@@ -122,10 +122,13 @@ def make_app(build_dir: str,
 
     # Read titles data
     titles = []
-    with open('data/imdb_titles_eng.txt', encoding='utf-8') as f:
+    with open('data/bert_corpus_title_uncased.txt', encoding='utf-8') as f:
         for line in f:
+            line = line.strip()
+            if not line:
+                continue
             tokens = line.split()
-            if len(tokens) >= 3:
+            if len(tokens) >= 2:
                 titles.append(tokens)
 
     app.titles = titles
@@ -351,9 +354,9 @@ def make_app(build_dir: str,
     @app.route('/rand', methods=['POST'])
     def random_prefix_title() -> Response:
         ind = random.randint(0, len(app.titles))
-        prefix = ' '.join(app.titles[ind][:2])
-        prefix = re.sub('[^0-9a-zA-Z\s+]+', '', prefix)
-        prefix = re.sub('\s+', ' ', prefix)
+        prefix = app.titles[ind][0]
+        # prefix = re.sub('[^0-9a-zA-Z\s+]+', '', prefix)
+        # prefix = re.sub('\s+', ' ', prefix)
         logger.info(' '.join(app.titles[ind]))
         return jsonify({"prefix": prefix})
 

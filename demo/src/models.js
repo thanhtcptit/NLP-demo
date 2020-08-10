@@ -3,6 +3,7 @@ import Gpt2_345 from './components/demos/Gpt2_345';
 import DistilmBert from './components/demos/DistilmBert';
 import BertLM from './components/demos/BertLM';
 import mBert from './components/demos/mBert';
+import BertFimPlus from './components/demos/BertFimPlus'
 import TransformerDecoder from './components/demos/TransformerDecoder'
 import TransformerDecoderSeq from './components/demos/TransformerDecoderSeq'
 import annotateIcon from './icons/annotate-14px.svg';
@@ -30,6 +31,7 @@ const modelGroups = [
         models: [
           {model: "mbert", name: "Mutilingual Bert", component: mBert},
           {model: "distilmbert", name: "Distil Mutilingual Bert", component: DistilmBert},
+          {model: "bert-fimplus", name: "Mutilingual Bert finetuned for FimPlus", component: BertFimPlus}
         ]
     },
     {
@@ -37,7 +39,7 @@ const modelGroups = [
       iconSrc: passageIcon,
       defaultOpen: true,
       models: [
-        {model: "transform_decoder", name: "Autoregressive Transformer-Decoder", component: TransformerDecoder},
+        // {model: "transform_decoder", name: "Autoregressive Transformer-Decoder", component: TransformerDecoder},
         {model: "transform_decoder_seq", name: "Seq2Seq Transformer-Decoder", component: TransformerDecoderSeq},
       ]
   }

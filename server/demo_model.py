@@ -1,7 +1,8 @@
 from allennlp.predictors import Predictor
 from allennlp.models.archival import load_archive
 
-from server.tones_prediction.transfomer_decoder import \
+from server.language_model.bert_fimplus import MaskedLMPredictor
+from server.tones_prediction.transformer_decoder import \
     TransformerDecoderPredictor
 
 
@@ -41,5 +42,7 @@ class CustomModel:
     def predictor(self):
         if self.predictor_name == 'transformer_decoder':
             return TransformerDecoderPredictor(*self.args, **self.kwargs)
+        elif self.predictor_name == 'bert_fimplus':
+            return MaskedLMPredictor(*self.args, **self.kwargs)
         else:
             raise ValueError('Unknown custom model')

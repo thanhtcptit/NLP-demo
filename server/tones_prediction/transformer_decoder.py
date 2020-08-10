@@ -5,40 +5,34 @@ import numpy as np
 import tensorflow as tf
 
 from nsds.common import Params
-from server.utils import load_model, clear_all_marks, basic_tokenizer, \
-    load_vocab
+
+from server.data.tokenization import Vocab
+from server.utils import load_model, clear_all_marks
 
 
-class TransformerDecoderPredictor():
+class TransformerDecoderPredictor:
     def __init__(self, config_path, model_path, beam_size=0,
                  in_graph_beam_search=True):
         params = Params.from_file(config_path)
         self.data_params = params['data']
-        self.model_params = params['model']
 
         self.max_length = self.data_params['max_length']
+        self.target_vocab_size = self.data_params['target_vocab_size']
+
         self.beam_size = beam_size
         self.in_graph_beam_search = in_graph_beam_search
-        self.word2idx, self.idx2word = load_vocab(
-            self.data_params['vocab_path'])
-
-        self.ref = {}
-        ind = 0
-        for idx, token in self.idx2word.items():
-            cleared = clear_all_marks(token)
-            if cleared not in self.ref:
-                self.ref[cleared] = ind
-                ind += 1
+        self.vocab = Vocab(self.data_params['target_vocab_path'])
 
         self.accent_vocab = {}
-        for token, idx in self.word2idx.items():
+        for token, idx in self.vocab.word2idx.items():
+            if not token:
+                continue
             raw_token = clear_all_marks(token) if token[0] != "<" else token
             if raw_token not in self.accent_vocab:
                 self.accent_vocab[raw_token] = [token]
             else:
-                curr = self.accent_vocab[raw_token]
-                if token not in curr:
-                    curr.append(token)
+                if token not in self.accent_vocab[raw_token]:
+                    self.accent_vocab[raw_token].append(token)
 
         sess_config = tf.ConfigProto()
         sess_config.gpu_options.allow_growth = True
@@ -47,38 +41,38 @@ class TransformerDecoderPredictor():
 
         load_model(model_path, session=self.sess)
         self.x = tf.get_default_graph().get_tensor_by_name(
-            'Placeholder:0')
-        try:
-            self.logits = tf.get_default_graph().get_tensor_by_name(
-                'decoder/MatMul:0')
-        except KeyError:
-            self.logits = tf.get_default_graph().get_tensor_by_name(
-                'MatMul:0')
-
+            'input_ids:0')
+        self.logits = tf.get_default_graph().get_tensor_by_name(
+            'logits:0')
         self.prediction = tf.get_default_graph().get_tensor_by_name(
-            'ToInt32:0')
-        self.probs = tf.nn.softmax(self.logits)
+            'predictions:0')
+        self.probs = tf.get_default_graph().get_tensor_by_name(
+            'probabilities:0')
 
     def predict(self, text):
-        words = basic_tokenizer(text)[:self.max_length]
-        pad_idx = self.word2idx["<pad>"]
+        txt = text.lower()
+        words = [self.vocab.get_sos_token()] + \
+            self.vocab.tokenize(text)[:self.max_length - 2] + \
+            [self.vocab.get_eos_token()]
+        sos_idx = self.vocab.get_sos_token_id()
+        eos_idx = self.vocab.get_eos_token_id()
+        pad_idx = self.vocab.get_pad_token_id()
 
         if self.beam_size:
             if self.in_graph_beam_search:
-                x = np.asarray([self.ref[w] if w in self.ref
-                               else self.ref["<unk>"] for w in words])
+                x = np.asarray(self.vocab.tokens_to_ids(words), dtype=np.int32)
                 x = np.atleast_2d(
-                    np.lib.pad(x, [0, self.max_length - len(x) + 1],
+                    np.lib.pad(x, [0, self.max_length - len(x)],
                                'constant', constant_values=pad_idx))
                 res = self.sess.run(tf.nn.ctc_beam_search_decoder(
-                    tf.expand_dims(self.logits, 1), [self.max_length], 3,
-                    merge_repeated=False),
+                    tf.expand_dims(self.logits, 1), [self.max_length],
+                    beam_width=self.beam_size, merge_repeated=False),
                     feed_dict={self.x: x})
                 paths = [res[0][0].values[:len(words)]]
             else:
-                sos_idx = self.word2idx["<sos>"]
+                sos_idx = self.vocab.get_sos_token()
                 init_state = np.full(
-                    shape=(self.max_length + 1), fill_value=pad_idx)
+                    shape=(self.max_length), fill_value=pad_idx)
                 init_state[0] = sos_idx
                 init_probs = self.sess.run(
                     self.probs,
@@ -86,24 +80,24 @@ class TransformerDecoderPredictor():
                 paths, state_probs = self.beam_search(
                     words, self.max_length, init_probs)
         else:
-            x = np.asarray([self.ref[w] if w in self.ref
-                            else self.ref["<unk>"] for w in words])
+            x = np.asarray(self.vocab.tokens_to_ids(words), dtype=np.int32)
             x = np.atleast_2d(
                 np.lib.pad(x, [0, self.max_length - len(x)],
                            'constant', constant_values=pad_idx))
-            paths = [self.sess.run(self.prediction, feed_dict={self.x: x})]
-            paths[0][len(words):] = pad_idx
+            paths = self.sess.run(self.prediction, feed_dict={self.x: x})
 
         results = []
         for path in paths:
             tokens = []
             for idx, token in enumerate(path):
-                if token == pad_idx:
+                if token == sos_idx:
+                    continue
+                if token in [eos_idx, pad_idx]:
                     break
-                if token != self.word2idx["<unk>"] and token != -1 and \
-                        token < len(self.idx2word) and \
-                        clear_all_marks(self.idx2word[token]) == words[idx]:
-                    tokens.append(self.idx2word[token])
+                if token != self.vocab.get_unk_token_id() and \
+                        clear_all_marks(
+                            self.vocab.idx2word[token]) == words[idx]:
+                    tokens.append(self.vocab.idx2word[token])
                 else:
                     tokens.append(words[idx])
 
@@ -122,17 +116,17 @@ class TransformerDecoderPredictor():
 
     def find_candidates(self, probs, word):
         if word not in self.accent_vocab:
-            return np.array([self.word2idx["<unk>"]]), np.array([1])
+            return np.array([self.vocab.get_unk_token()]), np.array([1])
         else:
             possible_candidates = np.asarray(
-                [self.word2idx[x] for x in self.accent_vocab[word]])
+                [self.vocab.tokens_to_ids(self.accent_vocab[word])])
             possible_candidates_probs = probs[possible_candidates]
             top_k = np.argsort(-possible_candidates_probs)[:self.beam_size]
             possible_candidates = possible_candidates[top_k]
             return possible_candidates, probs[possible_candidates]
 
     def beam_search(self, sent, max_length, initial_probs):
-        stop_token = self.word2idx["<pad>"]
+        stop_token = self.vocab.get_pad_token()
         num_tokens = len(sent)
         state_probs = np.zeros(self.beam_size, dtype=np.float32)
         all_candidates = np.zeros(
@@ -155,7 +149,7 @@ class TransformerDecoderPredictor():
             for level in range(1, num_tokens):
                 paths[i, level] = stop_token
             states[i, 1:num_tokens + 1] = paths[i].copy()
-            states[i, 0] = self.word2idx["<sos>"]
+            states[i, 0] = self.vocab.get_sos_token()
         top_k = list(top_k)
 
         # for each graph level
@@ -210,8 +204,13 @@ class TransformerDecoderPredictor():
 
 if __name__ == '__main__':
     s = time.time()
-    cfg_path = 'resources/transformer_decoder/config/transformer_decoder.json'
-    model_path = 'resources/transformer_decoder/model_epoch_06_gs_60792.pb'
+    cfg_path = "resources/transformer_decoder_fim/config.json"
+    model_path = "resources/transformer_decoder_fim/model.pb"
     model = TransformerDecoderPredictor(cfg_path, model_path, beam_size=0)
-    print(model.predict('Mot con vit xoe ra hai cai canh'))
+
+    from server.utils import remove_accent
+    text = 'cô gái đến từ hôm qua'
+    inp = remove_accent(text)
+    print(inp)
+    print(model.predict(inp))
     print(time.time() - s)

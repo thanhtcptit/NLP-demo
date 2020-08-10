@@ -25,19 +25,19 @@
         "max_request_length": 10000,
         "memory": "4Gi"
     },
-    "transformer_decoder": {
+    "bert-fimplus": {
         "type": "custom",
-        "predictor_name": "transformer_decoder",
-        "config_path": "resources/transformer_decoder/config/transformer_decoder.json",
-        "model_path": "resources/transformer_decoder/model_epoch_03_gs_75990.pb",
-        "beam_size": 3,
-        "in_graph_beam_search": 0
+        "predictor_name": "bert_fimplus",
+        "model_path": "resources/bert_fimplus_ag/model.pb",
+        "vocab_path": "resources/bert_fimplus_ag/vocab.txt",
+        "max_seq_length": 32,
+        "uncased": 1
     },
     "transformer_decoder_seq": {
         "type": "custom",
         "predictor_name": "transformer_decoder",
-        "config_path": "resources/transformer_decoder_seq/config/transformer_decoder.json",
-        "model_path": "resources/transformer_decoder_seq/model_epoch_06_gs_60792.pb",
+        "config_path": "resources/transformer_decoder_fim/config.json",
+        "model_path": "resources/transformer_decoder_fim/model.pb",
         "beam_size": 0
     }
 }
